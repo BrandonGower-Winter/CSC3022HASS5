@@ -5,6 +5,7 @@
 CC := g++
 CCFLAGS := -std=c++11
 SRCDIR := src
+INCLUDEDIR := include
 TESTDIR := tests
 BUILDDIR := build
 EXECUTABLE := bin/imageops
@@ -28,12 +29,10 @@ run:
 
 test:
 	@echo Compiling...
-	$(CC) $(CCFLAGS) -c -o $(BUILDDIR)/Image.o $(SRCDIR)/Image.cpp
-	$(CC) $(CCFLAGS) -c -o $(BUILDDIR)/Filter.o $(SRCDIR)/Filter.cpp
 	$(CC) $(CCFLAGS) -c -o $(BUILDDIR)/UnitTests.o $(TESTDIR)/UnitTests.cpp
 	@echo Compilation Complete
 	@echo Linking...
-	$(CC) $(CCFLAGS) -o $(TESTECUTABLE) $(BUILDDIR)/Image.o $(BUILDDIR)/Filter.o $(BUILDDIR)/UnitTests.o
+	$(CC) $(CCFLAGS) -o $(TESTECUTABLE) $(BUILDDIR)/UnitTests.o
 	@echo Linking Complete
 
 runTests:
