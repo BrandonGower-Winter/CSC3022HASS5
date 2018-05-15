@@ -2,6 +2,7 @@
 #define _MUSIC
 #include <vector>
 #include <utility>
+#include <cstdint>
 namespace GWRBRA001
 {
   enum MusicOperation
@@ -18,33 +19,41 @@ namespace GWRBRA001
     FADEOUT,
     NONE
   };
+  enum BitCount
+  {
+    EIGHT_BIT,
+    SIXTEEN_BIT
+  };
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
   template <typename T>
   class Music
   {
     public:
       Music();
       ~Music();
+      Music(int bitCount) : bitCount(bitCount) {}
+      Music(const Music<T> & copy);
+      Music(Music<T> && move);
 
-      Music(const Music& copy);
-      Music(Music && move);
+      Music<T> & operator=(const Music<T> & copy);
+      Music<T> & operator=(const Music<T> && move);
 
-      Music<T> & operator=(const Music & copy);
-      Music<T> & operator=(const Music && move);
+      Music<T> operator|(const Music<T> & rhs);
 
-      Music<T> operator|(const Music & rhs);
-      /*
-      Music operator*(const std::pair<float,float> & frequency);
+      Music<T> operator*(const std::pair<float,float> & frequency);
 
-      Music operator+(const Music & rhs);
+      Music<T> operator+(const Music<T> & rhs);
 
-      Music operator^(const std::pair<int,int> & cut);
-      */
+      Music<T> operator^(const std::pair<int,int> & cut);
+
     private:
       std::vector<T> buffer;
+      int bitCount;
   };
 
   template<typename T>
-  Music<T>::Music()
+  Music<T>::Music() : bitCount(EIGHT_BIT)
   {}
   template<typename T>
   Music<T>::~Music()
@@ -52,7 +61,7 @@ namespace GWRBRA001
     buffer.clear();
   }
   template<typename T>
-  Music<T>::Music(const Music& copy)
+  Music<T>::Music(const Music<T> & copy) : bitCount(copy.bitCount)
   {
     if(buffer.size() != 0)
     {
@@ -65,7 +74,7 @@ namespace GWRBRA001
     }
   }
   template<typename T>
-  Music<T>::Music(Music && move)
+  Music<T>::Music(Music<T> && move) : bitCount(move.bitCount)
   {
     if(buffer.size() != 0)
     {
@@ -80,6 +89,7 @@ namespace GWRBRA001
   template<typename T>
   Music<T> & Music<T>::operator=(const Music<T> & copy)
   {
+    bitCount = copy.bitCount;
     if(buffer.size() != 0)
     {
       buffer.clear();
@@ -94,6 +104,7 @@ namespace GWRBRA001
   template<typename T>
   Music<T> & Music<T>::operator=(const Music<T> && move)
   {
+     bitCount = move.bitCount;
     if(buffer.size() != 0)
     {
       buffer.clear();
@@ -121,34 +132,111 @@ namespace GWRBRA001
     }
     return newClip;
   }
-  /*
-  template<typename T>
-  Music Music<T>::operator*(const std::pair<float,float> & frequency);
-  template<typename T>
-  Music Music<T>::operator+(const Music<T> & rhs);
-  template<typename T>
-  Music Music<T>::operator^(const std::pair<int,int> & cut);
-*/
-/*
-  template<typename T>
-  class Modifyer
-  {
-    virtual T applyModification(T & modifyer) = 0;
-    virtual T applyAddition(T & lhs, T & rhs) = 0;
-  };
 
-  class ModifyerMono : Modifyer<float>
+  //MONO Implementation
+  template<>
+  Music<int> Music<int>::operator*(const std::pair<float,float> & frequency)
   {
-    virtual float & applyModification(float & modifyer);
-    virtual int & applyAddition(float & lhs, float & rhs);
-  };
-/*
-  class ModifyerStereo : frequencyModifyer<std::pair<float,float>>
+    Music<int> newClip = *this;
+    for(int i = 0; i < newClip.buffer.size(); ++i)
+    {
+      newClip.buffer[i] = (int)((float)newClip.buffer[i] * std::get<0>(frequency));
+    }
+    return newClip;
+  }
+
+  //STERIO Implementation
+  template<>
+  Music<std::pair<int,int>> Music<std::pair<int,int>>::operator*(const std::pair<float,float> & frequency)
   {
-    virtual std::pair<float,float> applyModification(std::pair<float,float> modifyer);
-    virtual std::pair<int,int> applyAddition(std::pair<float,float> lhs,std::pair<float,float> rhs);
-  };
-*/
+    Music<std::pair<int,int>> newClip = *this;
+    for(int i = 0; i < newClip.buffer.size(); ++i)
+    {
+      newClip.buffer[i].first = (int)((float)newClip.buffer[i].first * std::get<0>(frequency));
+      newClip.buffer[i].second = (int)((float)newClip.buffer[i].second * std::get<1>(frequency));
+    }
+    return newClip;
+  }
+
+  //MONO Implementation
+  template<>
+  Music<int> Music<int>::operator+(const Music<int> & rhs)
+  {
+    Music<int> newClip = *this;
+    for(int i = 0; i < newClip.buffer.size(); ++i)
+    {
+      newClip.buffer[i] = newClip.buffer[i] + rhs.buffer[i];
+      switch(bitCount)
+      {
+        case EIGHT_BIT:
+          if(newClip.buffer[i] > INT8_MAX)
+          {
+            newClip.buffer[i] = INT8_MAX;
+          }
+          break;
+        case SIXTEEN_BIT:
+          if(newClip.buffer[i] > INT16_MAX)
+          {
+            newClip.buffer[i] = INT16_MAX;
+          }
+          break;
+      }
+    }
+    return newClip;
+  }
+  //STEREO Implementation
+  template<>
+  Music<std::pair<int,int>> Music<std::pair<int,int>>::operator+(const Music<std::pair<int,int>> & rhs)
+  {
+    Music<std::pair<int,int>> newClip = *this;
+    for(int i = 0; i < newClip.buffer.size(); ++i)
+    {
+      newClip.buffer[i].first = newClip.buffer[i].first + rhs.buffer[i].first;
+      newClip.buffer[i].second = newClip.buffer[i].second + rhs.buffer[i].second;
+      switch(bitCount)
+      {
+        case EIGHT_BIT:
+          if(newClip.buffer[i].first > INT8_MAX)
+          {
+            newClip.buffer[i].first = INT8_MAX;
+          }
+          else if(newClip.buffer[i].second > INT8_MAX)
+          {
+            newClip.buffer[i].second = INT8_MAX;
+          }
+          break;
+        case SIXTEEN_BIT:
+          if(newClip.buffer[i].first > INT16_MAX)
+          {
+            newClip.buffer[i].first = INT16_MAX;
+          }
+          else if(newClip.buffer[i].second > INT16_MAX)
+          {
+            newClip.buffer[i].second = INT16_MAX;
+          }
+          break;
+      }
+    }
+    return newClip;
+  }
+
+  template<typename T>
+  Music<T> Music<T>::operator^(const std::pair<int,int> & cut)
+  {
+    Music<T> newClip;
+    for(int i = 0; i < buffer.size(); ++i)
+    {
+      if(i >= cut.first && i <= cut.second)
+      {
+        continue;
+      }
+      else
+      {
+        newClip.buffer.push_back(buffer[i]);
+      }
+    }
+    return newClip;
+  }
 
 }
 #endif
